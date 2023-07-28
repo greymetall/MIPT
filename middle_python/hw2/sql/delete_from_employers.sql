@@ -1,2 +1,2 @@
 delete from employers
-where coalesce(id, '') || coalese(name, '') = coalesce(:id, '') || coalese(:name, '')
+where coalesce(id, '') || coalesce(name, '') = coalesce(cast(:id as integer), '') || coalesce(:name, '')

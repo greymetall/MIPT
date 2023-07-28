@@ -1,0 +1,21 @@
+{
+    "db_name": "hw2.db",
+	"url_areas": "https://api.hh.ru/areas",
+	"url_vac": "https://api.hh.ru/vacancies",
+	"country": "Россия",
+    "regions": [
+        "Москва",
+        "Санкт-Петербург",
+        "Краснодарский край"
+    ],
+    "url_params": {
+		"text": "middle python",
+		"search_field": "name",
+		// "found": 200,
+		// "pages": 4,
+		"page": 0,
+        "per_page": 50,
+        "archived": false,
+        "area": null  
+    }
+}

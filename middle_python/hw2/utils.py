@@ -3,7 +3,7 @@ import pandas as pd
 from time import sleep
 import sqlite3
 from pathlib import Path
-from typing import List
+from typing import List, Literal
 
 
 def areas_parser(url: str, country: str, areas: List[str]) -> dict:
@@ -24,7 +24,7 @@ def get_query(query_file_path: str) -> str:
     return (Path('sql') / query_file_path).read_text(encoding='utf-8')
 
 
-def execute(query: str, db_name: str, params: 'dict | None' = None) -> int:
+def execute(query: str, db_name: str, params: 'dict | list | None' = None, many: bool = False) -> int:
     try:
         with sqlite3.connect(db_name) as connection:
             connection.row_factory = sqlite3.Row
@@ -32,7 +32,13 @@ def execute(query: str, db_name: str, params: 'dict | None' = None) -> int:
             if len(query.strip(';').split(';')) > 1:
                 cursor.executescript(query)
             else:
-                cursor.execute(query, params if params else {})
+                if params is None:
+                    cursor.execute(query)
+                else:
+                    if many:
+                        cursor.executemany(query, params)
+                    else:
+                        cursor.execute(query, params)
     except(Exception) as error:
         print(error)
         connection.rollback()
@@ -76,7 +82,7 @@ def get_data_by_api(url: str, params: 'dict | None' = None, attempts: int = 3) -
         # Проверяем ответ
         if result.status_code == 200:
             print('GET request sucessful')
-            sleep(5)
+            sleep(1)
             return result.json()
         else:
             print('Returned error code:', result.status_code)
@@ -95,6 +101,35 @@ def data_parser(val: 'dict | List[dict] | None'):
         return pd.Series(val[0] if val else val, dtype='O')
     else:
         return val
+
+
+def list_to_str(val):
+    if isinstance(val, list):
+        return ', '.join([v['name'] for v in val]) if val else None
+    else:
+        return val
+
+
+def update_table(
+    table_name: str,
+    db_name: str,
+    data: pd.DataFrame,
+    if_exists: "Literal['fail'] | Literal['replace'] | Literal['append']" = 'append',
+    many: bool = True,
+    attempts: int = 3
+):
+    # Обновляем таблицу (с удалением, чтобы избежать дублирования)
+    nrows = execute(query=get_query(f'delete_from_{table_name}.sql'),
+                    db_name=db_name,
+                    params=data.to_dict(orient='records'),
+                    many=many)
+    print('Удалено', nrows, 'строк(и) из таблицы', table_name)
+    # Запись DF в таблицу БД
+    persist_df(df=data,
+               table_name=table_name,
+               db_name=db_name,
+               if_exists=if_exists,
+               attempts=attempts)
 
 
 def persist_df(df: pd.DataFrame, table_name: str, db_name: str, *,
