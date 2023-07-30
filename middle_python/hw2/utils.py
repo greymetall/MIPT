@@ -16,6 +16,7 @@ def areas_parser(url: str, country: str, areas: List[str]) -> dict:
     areas_df = areas_df[areas_df.name.isin(areas)]  # оставляем только заданные регионы
     areas_df = areas_df[['id', 'name']]
     areas_dct = areas_df.set_index('id').name.to_dict()  # преобразовываем DF в словарь
+    print(f'id регионов: {areas_dct}')
     return areas_dct
 
 
@@ -166,10 +167,8 @@ def normalizer(txt: 'str | None') -> 'str | None':
     txt = re.sub(r'\s?framework\s?', '', txt)
     if re.search('python', txt):
         return 'python'
-    if re.search('rest|api', txt):
+    if re.search('rest|fast|api', txt):
         return 'rest api'
-    if re.search('fast', txt):
-        return 'fast api'
     if re.search('django', txt):
         return 'django'
     if re.search('git', txt):

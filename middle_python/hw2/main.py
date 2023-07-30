@@ -9,15 +9,17 @@ settings = json5.load(open('settings.json', encoding='utf-8'))
 
 # globals().update(**settings)
 db_name = settings['db_name']
-url_areas = settings['url_areas']
+num_vac = settings['num_vac']
 url_vac = settings['url_vac']
+
+url_areas = settings['url_areas']
 country = settings['country']
 regions = settings['regions']
+
 url_params = settings['url_params']
-num_vac = settings['num_vac']
+
 
 areas_dct = areas_parser(url_areas, country, regions)  # получаем id заданных регионов
-print(f'id регионов: {areas_dct}')
 areas_lst = list(areas_dct)
 
 url_params['area'] = areas_lst
@@ -33,10 +35,8 @@ def get_vacancies(url, params, vacancies=None):
         _vacancies = data.get('items', [])
         found, page, pages = data.get('found', 0), data.get('page', 0), data.get('pages', 1)
         params.update(found=found, page=page + 1, pages=pages)
-        print(f'\tfound: {found}, pages: {pages}, page: {page} in get_vac')
+        print(f'\tНайдено: {found}, страниц: {pages}, страница: {page}')
         vacancies += _vacancies
-
-        print('\tpage after in get_vac', params.get('page'), page)
 
         # Количество вакансий
         print('Количество спарсенных со стр', page,
@@ -46,10 +46,6 @@ def get_vacancies(url, params, vacancies=None):
         if len(vacancies) < (found if found < num_vac else num_vac) and page < pages:
             sleep(3)
             get_vacancies(url, params, vacancies)
-            page += 1
-            print('\tpage after recursion in get_vac', params.get('page'), page)
-
-    print('\tpage final in get_vac', params.get('page'))
     return vacancies
 
 
@@ -92,8 +88,8 @@ def employers_proccessing(vacancies_df: pd.DataFrame):
     ]
 
     # vacancies_df = pd.concat([vacancies_df,
-    #                           employers_df.add_prefix('company_')],
-    #                          axis=1)
+    #                          employers_df.add_prefix('company_')],
+    #                         axis=1)
     # Убираем дубли
     employers_df = employers_df[~employers_df.duplicated()]
     # Запись DF в таблицу БД employers
@@ -127,21 +123,19 @@ def key_skills_processing(vacancies_df: pd.DataFrame):
 
 def vacancies_processing(df: pd.DataFrame = pd.DataFrame()):
     """Обработка списка вакансий и преобразование в таблицы"""
-    print('page before in proc', url_params.get('page'))
+    print('\nПарсинг страницы', url_params.get('page'), end='\n\n')
     fill_vac = [{}] * len(df)
     vacancies = get_vacancies(url_vac, url_params, fill_vac)
     found, page, pages = (url_params.get('found', 0),
                           url_params.get('page', 0),
                           url_params.get('pages', 0))
-    print('page after in proc', page)
-    print('num vac =', len(vacancies))
-    print('len df is:', len(df))
+    print(f'Спарсено {len(vacancies)} вакансий, с {page} страниц')
 
     # Парсим список вакансий в DF и оставляем только нужные атрибуты
     vacancy_attribs = ['id', 'name', 'url', 'alternate_url', 'employer', 'area',
                        'employment', 'salary', 'experience', 'professional_roles',
                        'published_at', 'created_at', 'archived']
-
+    global vacancies_df
     vacancies_df = pd.DataFrame(vacancies)[vacancy_attribs]
     # очистка DF от добавленных пустых строк
     vacancies.clear()  # очистка массива со спарсенными ранее вакансиями
@@ -162,8 +156,8 @@ def vacancies_processing(df: pd.DataFrame = pd.DataFrame()):
                               salary_df.add_prefix('salary_')], axis=1)
 
     # Парсим дополнительные атрибуты по каждой вакансии по API и записываем в DF вакансий
+    print('Парсинг детального описания каждой из вакансий\n')
     vacancies_df['details'] = vacancies_df.url.apply(get_data_by_api)
-
     details_df = vacancies_df.details.apply(data_parser)
     details_df = details_df[
         ['description',
@@ -208,15 +202,15 @@ def vacancies_processing(df: pd.DataFrame = pd.DataFrame()):
     vacancies_df = pd.concat([df, vacancies_df[vacancies_attribs]], ignore_index=True)
     # Убираем дубли
     vacancies_df = vacancies_df[~vacancies_df.id.duplicated()]
-    print('len vacancies_df after filters is:', len(vacancies_df))
+    print('\nРазмер массива вакансий после применённых фильтров:', len(vacancies_df))
+    print()
     if len(vacancies_df) < (found if found < num_vac else num_vac) and page < pages:
         # Если количество вакансий после фильтров оказалось меньше 100,
         # и при этом найдено более 100 вакансий, то запускаем процесс заново
         sleep(10)  # ожидание чтобы не попасть на капчу
         vacancies_processing(vacancies_df.copy(deep=True))
-        print('len vacancies_df after recursion is:', len(vacancies_df))
         return
-    print('len vacancies_df final is:', len(vacancies_df))
+    print(f'Всего спарсено {len(vacancies_df)} и будет загружено в таблицу vacancies', end='\n\n')
 
     update_table('vacancies', db_name, vacancies_df)
 
@@ -227,7 +221,7 @@ def vacancies_processing(df: pd.DataFrame = pd.DataFrame()):
     execute('vacuum', db_name)
 
 
-if __name__ == '__main__':
+def main():
     # Создаём таблицу employers в БД
     execute(get_query('create_employers.sql'), db_name)
     # Создаём таблицу vacancies в БД
@@ -236,3 +230,7 @@ if __name__ == '__main__':
     execute(get_query('create_key_skills.sql'), db_name)
 
     vacancies_processing()
+
+
+if __name__ == '__main__':
+    main()
