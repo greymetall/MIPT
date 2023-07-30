@@ -62,3 +62,8 @@ vacancies, столбцы:
 |employment|занятость|employment {name}|
 |accredited_it_employer|имеет ли компания аккредитацию IT-компании|
 |professional_roles|профессиональная область|professional_roles {name}|
+
+#### Запуск
+* python main.py
+или
+* hw2.ipynb
