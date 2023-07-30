@@ -65,5 +65,5 @@ vacancies, столбцы:
 
 #### Запуск
 * python main.py
-или
+<br>или
 * hw2.ipynb
